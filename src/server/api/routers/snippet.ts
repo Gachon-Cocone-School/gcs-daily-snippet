@@ -25,13 +25,13 @@ export const snippetRouter = createTRPCRouter({
     .input(z.object({ date: z.string() }))
     .query(async ({ input, ctx }) => {
       try {
-        const userId = ctx.session?.user?.id || "debug-user-id";
+        const userId = ctx.session?.user?.id ?? "debug-user-id";
         const snippetId = `${userId}_${input.date}`;
 
         console.log(`Fetching snippet with ID: ${snippetId}`);
 
         // Return from our in-memory mock database
-        return snippets[snippetId] || null;
+        return snippets[snippetId] ?? null;
       } catch (error) {
         console.error("Error fetching snippet:", error);
         throw new TRPCError({
@@ -46,7 +46,7 @@ export const snippetRouter = createTRPCRouter({
   // Get all snippets for the current user
   getAllByUser: publicProcedure.query(async ({ ctx }) => {
     try {
-      const userId = ctx.session?.user?.id || "debug-user-id";
+      const userId = ctx.session?.user?.id ?? "debug-user-id";
 
       console.log(`Fetching all snippets for user: ${userId}`);
 
@@ -89,7 +89,7 @@ export const snippetRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        const userId = ctx.session?.user?.id || "debug-user-id";
+        const userId = ctx.session?.user?.id ?? "debug-user-id";
         const snippetId = `${userId}_${input.date}`;
         const now = new Date();
 

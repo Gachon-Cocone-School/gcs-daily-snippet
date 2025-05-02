@@ -51,7 +51,8 @@ export default function SnippetPage({
         const snippetDoc = await getDoc(snippetRef);
 
         if (snippetDoc.exists()) {
-          const snippetText = snippetDoc.data().snippet;
+          const snippetData = snippetDoc.data();
+          const snippetText = snippetData.snippet as string;
           setSnippet(snippetText);
           setOriginalSnippet(snippetText); // 원본 스니펫 저장
           setSnippetExists(true);
@@ -260,8 +261,7 @@ export default function SnippetPage({
                         />
                       ),
                       p: ({ node, ...props }) => (
-                        <p className="my-2" {...props}
-                        />
+                        <p className="my-2" {...props} />
                       ),
                       blockquote: ({ node, ...props }) => (
                         <blockquote

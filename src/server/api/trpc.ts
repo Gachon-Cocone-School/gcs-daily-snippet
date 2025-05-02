@@ -11,6 +11,14 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { adminAuth } from "~/lib/firebase-admin";
 
+// Define the expected types for the Firebase auth token
+interface DecodedIdToken {
+  uid: string;
+  email?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
 /**
  * 1. CONTEXT
  *
@@ -28,16 +36,18 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   const authHeader = opts.headers.get("authorization");
   let session = null;
 
-  if (authHeader && authHeader.startsWith("Bearer ")) {
+  if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
     try {
       // Verify the token with Firebase Admin SDK
-      const decodedToken = await adminAuth.verifyIdToken(token);
+      const decodedToken = (await adminAuth.verifyIdToken(
+        token,
+      )) as DecodedIdToken;
       session = {
         user: {
           id: decodedToken.uid,
-          email: decodedToken.email || "",
-          name: decodedToken.name || "",
+          email: decodedToken.email ?? "",
+          name: decodedToken.name ?? "",
         },
       };
     } catch (error) {
@@ -121,7 +131,7 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * Auth middleware to ensure user is authenticated
  */
 const isAuthed = t.middleware(({ next, ctx }) => {
-  if (!ctx.session || !ctx.session.user) {
+  if (!ctx.session?.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Not authenticated" });
   }
   return next({

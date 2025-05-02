@@ -1,12 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import {
-  User,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-} from "firebase/auth";
+import type { User } from "firebase/auth";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, googleProvider, db } from "~/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import Strings from "~/constants/strings";
@@ -56,12 +52,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
 
       if (user) {
         // 사용자가 로그인했을 때 인증 확인
-        await checkUserAuthorization(user);
+        void checkUserAuthorization(user);
       } else {
         setAuthorized(null);
       }

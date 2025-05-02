@@ -26,6 +26,15 @@ import Strings from "~/constants/strings";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "~/lib/firebase";
 
+// Define type for snippets
+interface Snippet {
+  userId: string;
+  date: string;
+  snippet: string;
+  created_at: Date;
+  modified_at: Date;
+}
+
 // Simple Snackbar component
 function Snackbar({
   message,
@@ -62,7 +71,7 @@ export default function Home() {
   const [currentDate, setCurrentDate] = useState(today);
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
   const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
-  const [userSnippets, setUserSnippets] = useState<Record<string, any>>({});
+  const [userSnippets, setUserSnippets] = useState<Record<string, Snippet>>({});
   const [isLoadingSnippets, setIsLoadingSnippets] = useState(false);
 
   // Generate years for dropdown (10 years back from current year)
@@ -86,10 +95,10 @@ export default function Home() {
         );
 
         const querySnapshot = await getDocs(snippetsQuery);
-        const snippetsMap: Record<string, any> = {};
+        const snippetsMap: Record<string, Snippet> = {};
 
         querySnapshot.forEach((doc) => {
-          const data = doc.data();
+          const data = doc.data() as Snippet;
           snippetsMap[data.date] = data;
         });
 
@@ -208,10 +217,10 @@ export default function Home() {
       );
 
       const querySnapshot = await getDocs(snippetsQuery);
-      const snippetsMap: Record<string, any> = {};
+      const snippetsMap: Record<string, Snippet> = {};
 
       querySnapshot.forEach((doc) => {
-        const data = doc.data();
+        const data = doc.data() as Snippet;
         snippetsMap[data.date] = data;
       });
 
@@ -254,11 +263,13 @@ export default function Home() {
               />
             ) : (
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                {(user.displayName || user.email || "?")[0].toUpperCase()}
+                {(
+                  (user?.displayName ?? user?.email ?? "?").charAt(0) ?? "?"
+                ).toUpperCase()}
               </div>
             )}
             <div className="text-gray-700">
-              {user.displayName || user.email}
+              {user.displayName ?? user.email}
             </div>
           </div>
           <button
@@ -365,10 +376,9 @@ export default function Home() {
 
             {/* Empty cells for proper day alignment */}
             {calendarDays.length > 0 &&
-              Array.from(
-                { length: new Date(calendarDays[0]).getDay() },
-                (_, i) => <div key={`empty-${i}`} className="p-2"></div>,
-              )}
+              Array.from({ length: calendarDays[0]?.getDay() ?? 0 }, (_, i) => (
+                <div key={`empty-${i}`} className="p-2"></div>
+              ))}
 
             {/* Calendar days */}
             {calendarDays.map((date) => {
@@ -392,7 +402,7 @@ export default function Home() {
                   {format(date, "d")}
                   {hasSnippetForDate && !isFutureDate && (
                     <div className="absolute bottom-1 left-1 h-4 w-4 overflow-hidden rounded-full border border-white">
-                      {user.photoURL ? (
+                      {user?.photoURL ? (
                         <img
                           src={user.photoURL}
                           alt=""
@@ -400,9 +410,11 @@ export default function Home() {
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-blue-500 text-[6px] text-white">
-                          {(user.displayName ||
-                            user.email ||
-                            "?")[0].toUpperCase()}
+                          {(
+                            (user?.displayName ?? user?.email ?? "?").charAt(
+                              0,
+                            ) ?? "?"
+                          ).toUpperCase()}
                         </div>
                       )}
                     </div>

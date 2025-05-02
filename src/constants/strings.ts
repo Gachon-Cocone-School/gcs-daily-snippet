@@ -14,6 +14,7 @@ export const Strings = {
   authChecking: "멤버십 확인 중...",
   notAuthorized: "인증되지 않은 사용자입니다. GCS 멤버만 사용 가능합니다.",
   authError: "인증 확인 중 오류가 발생했습니다.",
+  logOut: "로그아웃",
 
   // Login page
   appTagline:

@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, googleProvider, db } from "~/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import Strings from "~/constants/strings";
 
 interface AuthContextType {
@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authChecking, setAuthChecking] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // 사용자 이메일이 members 컬렉션에 등록되어 있는지 확인
+  // 사용자 이메일이 허용 목록에 등록되어 있는지 확인
   const checkUserAuthorization = async (user: User) => {
     if (!user.email) return false;
 
@@ -34,20 +34,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthError(null);
 
     try {
-      const membersRef = collection(db, "members");
-      const q = query(membersRef, where("email", "==", user.email));
-      const querySnapshot = await getDocs(q);
+      // NEXT_PUBLIC_ALLOW_LIST 환경 변수에서 허용된 이메일 목록 가져오기
+      const allowList = process.env.NEXT_PUBLIC_ALLOW_LIST || "";
+      const allowedEmails = allowList.split(",").map((email) => email.trim());
 
-      const isAuthorized = !querySnapshot.empty;
+      // 사용자 이메일이 목록에 있는지 확인
+      const isAuthorized = allowedEmails.includes(user.email);
       setAuthorized(isAuthorized);
       return isAuthorized;
     } catch (error) {
-      console.error("Error checking member authorization:", error);
+      console.error("Error checking user authorization:", error);
       setAuthError(Strings.authError);
       setAuthorized(false);
       return false;
     } finally {
       setAuthChecking(false);
+    }
+  };
+
+  // 사용자 정보를 Firestore의 users 컬렉션에 저장
+  const saveUserToFirestore = async (user: User) => {
+    if (!user) return;
+
+    try {
+      // users 컬렉션에 사용자 문서 생성 또는 업데이트
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(
+        userRef,
+        {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          lastLogin: new Date(),
+        },
+        { merge: true }, // merge: true를 사용하면 문서가 이미 존재할 경우 병합됩니다
+      );
+      console.log("User info saved to Firestore");
+    } catch (error) {
+      console.error("Error saving user to Firestore:", error);
     }
   };
 
@@ -58,6 +83,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         // 사용자가 로그인했을 때 인증 확인
         void checkUserAuthorization(user);
+        // 사용자 정보를 Firestore에 저장
+        void saveUserToFirestore(user);
       } else {
         setAuthorized(null);
       }
@@ -76,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 로그인 성공 후 인증 확인
       if (result.user) {
         await checkUserAuthorization(result.user);
+        await saveUserToFirestore(result.user); // Firestore에 사용자 정보 저장
       }
     } catch (error) {
       console.error("Error signing in with Google", error);

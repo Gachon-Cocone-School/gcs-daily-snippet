@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { format, parse } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useAuth } from "~/lib/auth-context";
@@ -12,6 +12,7 @@ import {
   query,
   where,
   getDocs,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "~/lib/firebase";
 import Link from "next/link";
@@ -58,6 +59,13 @@ export default function SnippetPage({
   const [isLoadingSnippets, setIsLoadingSnippets] = useState(true);
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [previousSnippet, setPreviousSnippet] = useState<string | null>(null);
+  const [previousSnippetPlaceholder, setPreviousSnippetPlaceholder] = useState<
+    string | null
+  >(null);
+  const [hasFetchedPrevious, setHasFetchedPrevious] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user, teamName } = useAuth();
 
   // Format date from URL param (yyyy-MM-dd)
@@ -118,6 +126,83 @@ export default function SnippetPage({
     }
   };
 
+  // Function to fetch the most recent snippet (not just yesterday's)
+  const fetchMostRecentSnippet = useCallback(async () => {
+    if (!user || !teamName || !isToday || hasFetchedPrevious || snippetExists)
+      return;
+
+    try {
+      // Query to find the user's most recent snippet
+      const snippetsQuery = query(
+        collection(db, "snippets"),
+        where("userId", "==", user.uid),
+        where("teamName", "==", teamName),
+        // Date earlier than today
+        where("date", "<", formattedDate),
+      );
+
+      const querySnapshot = await getDocs(snippetsQuery);
+
+      if (querySnapshot.empty) {
+        // Use snippet template if no previous snippet exists
+        setPreviousSnippet(Strings.snippetTemplate);
+        setPreviousSnippetPlaceholder(Strings.snippetTemplate);
+        return;
+      }
+
+      // Find the most recent snippet by comparing dates
+      let mostRecentSnippet: SnippetData | null = null;
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as SnippetData;
+
+        if (!mostRecentSnippet || data.date > mostRecentSnippet.date) {
+          mostRecentSnippet = data;
+        }
+      });
+
+      if (mostRecentSnippet) {
+        setPreviousSnippet(mostRecentSnippet.snippet);
+        setPreviousSnippetPlaceholder(mostRecentSnippet.snippet);
+      } else {
+        // Fallback to template
+        setPreviousSnippet(Strings.snippetTemplate);
+        setPreviousSnippetPlaceholder(Strings.snippetTemplate);
+      }
+    } catch (error) {
+      console.error("Error fetching most recent snippet:", error);
+      // Use template in case of error
+      setPreviousSnippet(Strings.snippetTemplate);
+      setPreviousSnippetPlaceholder(Strings.snippetTemplate);
+    } finally {
+      setHasFetchedPrevious(true);
+    }
+  }, [
+    user,
+    teamName,
+    formattedDate,
+    isToday,
+    hasFetchedPrevious,
+    snippetExists,
+  ]);
+
+  // Apply previous snippet when Tab key is pressed
+  const handleTabKeyForPreviousSnippet = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (
+        e.key === "Tab" &&
+        previousSnippet &&
+        isToday &&
+        isEditMode &&
+        !snippetExists
+      ) {
+        e.preventDefault();
+        setSnippet(previousSnippet);
+      }
+    },
+    [previousSnippet, isToday, isEditMode, snippetExists],
+  );
+
   // Load all snippets for the date from Firestore
   useEffect(() => {
     async function loadAllSnippets() {
@@ -139,7 +224,8 @@ export default function SnippetPage({
             setSnippet("");
             setOriginalSnippet("");
             setSnippetExists(false);
-            setIsEditMode(true);
+            // Only set edit mode if there are no snippets for today
+            setIsEditMode(false);
             setAllSnippets([]);
           }
           setIsLoadingSnippets(false);
@@ -206,9 +292,15 @@ export default function SnippetPage({
           setOriginalSnippet("");
           setSnippetExists(false);
 
-          if (isToday) {
+          // Only automatically enter edit mode if there are no snippets at all for today
+          if (isToday && snippetsArray.length === 0) {
             setIsEditMode(true);
+          } else {
+            setIsEditMode(false);
           }
+        } else {
+          // If user has a snippet, always start in view mode
+          setIsEditMode(false);
         }
 
         // Fetch user profiles for all the emails
@@ -225,6 +317,19 @@ export default function SnippetPage({
 
     void loadAllSnippets();
   }, [formattedDate, user, teamName, isToday]);
+
+  // Fetch previous snippet when entering edit mode
+  useEffect(() => {
+    if (isEditMode && isToday && !snippetExists && !hasFetchedPrevious) {
+      void fetchMostRecentSnippet();
+    }
+  }, [
+    isEditMode,
+    isToday,
+    snippetExists,
+    hasFetchedPrevious,
+    fetchMostRecentSnippet,
+  ]);
 
   // Save the snippet to Firestore
   const handleSave = async () => {
@@ -274,6 +379,39 @@ export default function SnippetPage({
       console.error("Error saving snippet:", error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Delete the snippet from Firestore
+  const handleDelete = async () => {
+    if (!user || !isToday || !mySnippet) return;
+
+    if (!confirm("스니펫을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const snippetId = `${user.uid}_${formattedDate}`;
+      const snippetRef = doc(db, "snippets", snippetId);
+
+      await deleteDoc(snippetRef);
+
+      // Update local state
+      setMySnippet(null);
+      setSnippet("");
+      setOriginalSnippet("");
+      setSnippetExists(false);
+      setIsEditMode(false);
+
+      // Update all snippets list
+      setAllSnippets((prevSnippets) =>
+        prevSnippets.filter((s) => s.snippetId !== snippetId),
+      );
+    } catch (error) {
+      console.error("Error deleting snippet:", error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -329,10 +467,16 @@ export default function SnippetPage({
                 </div>
               </div>
               <textarea
+                ref={textareaRef}
                 value={snippet}
                 onChange={(e) => setSnippet(e.target.value)}
+                onKeyDown={handleTabKeyForPreviousSnippet}
                 className="mb-4 h-80 w-full resize-none rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                placeholder={Strings.snippetPlaceholder}
+                placeholder={
+                  previousSnippetPlaceholder
+                    ? `${Strings.snippetPlaceholder}\n\n${previousSnippetPlaceholder.slice(0, 150)}${previousSnippetPlaceholder.length > 150 ? "..." : ""}`
+                    : Strings.snippetPlaceholder
+                }
               ></textarea>
 
               <div className="flex justify-end gap-2">
@@ -370,9 +514,9 @@ export default function SnippetPage({
                       key={snippetData.snippetId}
                       className="mb-6 border-b border-gray-100 pb-6 last:mb-0 last:border-b-0 last:pb-0"
                     >
-                      {/* Show edit button for my snippet if it's today */}
+                      {/* Show edit and delete buttons for my snippet if it's today */}
                       {isMySnippet && isToday && (
-                        <div className="mb-2 flex justify-end">
+                        <div className="mb-2 flex justify-end gap-2">
                           <button
                             onClick={() => {
                               setSnippet(snippetData.snippet);
@@ -381,6 +525,17 @@ export default function SnippetPage({
                             className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white transition hover:bg-blue-700"
                           >
                             {Strings.editSnippet}
+                          </button>
+                          <button
+                            onClick={() => void handleDelete()}
+                            disabled={isDeleting}
+                            className={`rounded-md px-3 py-1 text-sm text-white transition ${
+                              isDeleting
+                                ? "cursor-not-allowed bg-red-400"
+                                : "bg-red-600 hover:bg-red-700"
+                            }`}
+                          >
+                            {Strings.deleteSnippet}
                           </button>
                         </div>
                       )}

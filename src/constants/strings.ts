@@ -29,14 +29,16 @@ export const Strings = {
 
   // Snippet
   editSnippet: "수정",
+  deleteSnippet: "삭제",
   createSnippet: "작성",
   saveSnippet: "저장",
   cancelEdit: "취소",
   savingSnippet: "저장 중...",
   noSnippetToday: "아직 오늘의 스니펫이 없습니다.",
   noSnippetForDate: "이 날짜에 스니펫이 없습니다.",
-  snippetPlaceholder:
-    "오늘의 스니펫을 입력하세요...(마크다운 형식을 지원합니다)",
+  snippetPlaceholder: "Tab 키를 누르면 제안된 스니펫이 적용됩니다.",
+  snippetTemplate:
+    "# 오늘의 할 일\n\n- [ ] 작업 1\n- [ ] 작업 2\n- [ ] 작업 3\n\n# 메모\n\n내용을 입력하세요...",
 
   // Markdown
   markdownSupported: "마크다운 문법을 사용할 수 있습니다",

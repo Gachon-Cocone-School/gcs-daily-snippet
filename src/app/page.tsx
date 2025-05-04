@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "~/lib/auth-context";
 import {
@@ -17,7 +17,6 @@ import {
   getMonth,
   setMonth,
   setYear,
-  parseISO,
   isBefore as isDateBefore,
   isAfter,
 } from "date-fns";
@@ -132,7 +131,7 @@ export default function Home() {
   };
 
   // Function to fetch user profiles for a set of email addresses
-  const fetchUserProfiles = async (emails: Set<string>) => {
+  const fetchUserProfiles = useCallback(async (emails: Set<string>) => {
     if (emails.size === 0) return;
 
     setIsLoadingProfiles(true);
@@ -143,15 +142,15 @@ export default function Home() {
       );
 
       const querySnapshot = await getDocs(usersQuery);
-      const profilesMap: Record<string, UserProfile> = { ...userProfiles };
+      const profilesMap: Record<string, UserProfile> = {};
 
       querySnapshot.forEach((doc) => {
         const userData = doc.data();
         if (userData.email) {
           profilesMap[userData.email] = {
             email: userData.email,
-            displayName: userData.displayName,
-            photoURL: userData.photoURL,
+            displayName: userData.displayName ?? undefined,
+            photoURL: userData.photoURL ?? undefined,
           };
         }
       });
@@ -162,15 +161,7 @@ export default function Home() {
     } finally {
       setIsLoadingProfiles(false);
     }
-  };
-
-  // Helper function to get user profile for an email
-  const getUserProfile = (
-    email: string | undefined,
-  ): UserProfile | undefined => {
-    if (!email) return undefined;
-    return userProfiles[email];
-  };
+  }, []);
 
   // Load snippets directly from Firestore
   useEffect(() => {
@@ -203,7 +194,7 @@ export default function Home() {
           if (!snippetsMap[data.date]) {
             snippetsMap[data.date] = [];
           }
-          snippetsMap[data.date].push(data);
+          snippetsMap[data.date]!.push(data);
         });
 
         setUserSnippets(snippetsMap);
@@ -229,7 +220,7 @@ export default function Home() {
     }
 
     void fetchUserSnippets();
-  }, [user, teamName, currentDate]); // Add currentDate dependency to refetch when month changes
+  }, [user, teamName, currentDate, fetchUserProfiles]); // fetchUserProfiles 의존성 추가
 
   useEffect(() => {
     // 로그인되지 않았거나 인증되지 않은 사용자는 로그인 페이지로 리디렉션
@@ -355,7 +346,7 @@ export default function Home() {
         if (!snippetsMap[data.date]) {
           snippetsMap[data.date] = [];
         }
-        snippetsMap[data.date].push(data);
+        snippetsMap[data.date]!.push(data);
       });
 
       setUserSnippets(snippetsMap);
@@ -370,7 +361,8 @@ export default function Home() {
     }
   };
 
-  const hasSnippet = (date: Date) => {
+  // 날짜에 스니펫이 있는지 확인하는 함수 (현재 사용되지 않지만 향후 사용 가능함)
+  const _hasSnippet = (date: Date) => {
     const dateString = format(date, "yyyy-MM-dd");
     return !!userSnippets[dateString];
   };
@@ -533,11 +525,12 @@ export default function Home() {
             {/* Calendar days */}
             {calendarDays.map((date) => {
               const isCurrentDay = isToday(date);
-              const isPastDate = isDateBefore(date, today) && !isCurrentDay;
+              // 과거 날짜 상태는 사용되지 않지만 후속 기능에 필요할 수 있으므로 _접두사 추가
+              const _isPastDate = isDateBefore(date, today) && !isCurrentDay;
               const isFutureDate = isAfter(date, today);
               const dateString = format(date, "yyyy-MM-dd");
               const hasSnippetForDate = !!userSnippets[dateString];
-              const snippetsForDate = userSnippets[dateString] || [];
+              const snippetsForDate = userSnippets[dateString] ?? [];
 
               // Get unique emails for this date and sort them:
               // 1. Current user's email first

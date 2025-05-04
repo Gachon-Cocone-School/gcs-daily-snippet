@@ -57,6 +57,7 @@ export default function SnippetPage({
   const [originalSnippet, setOriginalSnippet] = useState(""); // 원본 스니펫 저장
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSnippets, setIsLoadingSnippets] = useState(true);
+  // isLoadingProfiles 상태는 내부적으로 사용됨
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -79,7 +80,7 @@ export default function SnippetPage({
   const [snippetExists, setSnippetExists] = useState(false);
 
   // Function to fetch user profiles for a set of email addresses
-  const fetchUserProfiles = async (emails: Set<string>) => {
+  const fetchUserProfiles = useCallback(async (emails: Set<string>) => {
     if (emails.size === 0) return;
 
     setIsLoadingProfiles(true);
@@ -111,8 +112,8 @@ export default function SnippetPage({
           if (userData.email) {
             profiles[userData.email] = {
               email: userData.email,
-              displayName: userData.displayName,
-              photoURL: userData.photoURL,
+              displayName: userData.displayName ?? undefined,
+              photoURL: userData.photoURL ?? undefined,
             };
           }
         });
@@ -124,7 +125,7 @@ export default function SnippetPage({
     } finally {
       setIsLoadingProfiles(false);
     }
-  };
+  }, []);
 
   // Function to fetch the most recent snippet (not just yesterday's)
   const fetchMostRecentSnippet = useCallback(async () => {
@@ -151,19 +152,23 @@ export default function SnippetPage({
       }
 
       // Find the most recent snippet by comparing dates
-      let mostRecentSnippet: SnippetData | null = null;
+      let mostRecentDate = "";
+      let mostRecentSnippetText = "";
 
       querySnapshot.forEach((doc) => {
-        const data = doc.data() as SnippetData;
+        const data = doc.data();
+        const snippetDate = data.date || "";
+        const snippetText = data.snippet || "";
 
-        if (!mostRecentSnippet || data.date > mostRecentSnippet.date) {
-          mostRecentSnippet = data;
+        if (!mostRecentDate || snippetDate > mostRecentDate) {
+          mostRecentDate = snippetDate;
+          mostRecentSnippetText = snippetText;
         }
       });
 
-      if (mostRecentSnippet) {
-        setPreviousSnippet(mostRecentSnippet.snippet);
-        setPreviousSnippetPlaceholder(mostRecentSnippet.snippet);
+      if (mostRecentSnippetText) {
+        setPreviousSnippet(mostRecentSnippetText);
+        setPreviousSnippetPlaceholder(mostRecentSnippetText);
       } else {
         // Fallback to template
         setPreviousSnippet(Strings.snippetTemplate);
@@ -316,7 +321,7 @@ export default function SnippetPage({
     }
 
     void loadAllSnippets();
-  }, [formattedDate, user, teamName, isToday]);
+  }, [formattedDate, user, teamName, isToday, fetchUserProfiles]);
 
   // Fetch previous snippet when entering edit mode
   useEffect(() => {
@@ -346,6 +351,22 @@ export default function SnippetPage({
       const snippetRef = doc(db, "snippets", snippetId);
       const snippetDoc = await getDoc(snippetRef);
 
+      // 새로운 스니펫 데이터 객체 생성
+      const updatedSnippetData: SnippetData = {
+        snippetId,
+        userId,
+        userEmail: userEmail || "",
+        date: formattedDate,
+        snippet: snippet,
+        created_at: snippetDoc.exists()
+          ? snippetDoc.data().created_at instanceof Date
+            ? snippetDoc.data().created_at
+            : new Date(snippetDoc.data().created_at)
+          : now,
+        modified_at: now,
+        teamName: teamName || "",
+      };
+
       if (snippetDoc.exists()) {
         // Update existing snippet
         await setDoc(
@@ -372,8 +393,57 @@ export default function SnippetPage({
         });
       }
 
+      // 로컬 상태 업데이트
       setOriginalSnippet(snippet); // 저장 후 원본 업데이트
       setSnippetExists(true);
+      setMySnippet(updatedSnippetData);
+
+      // 현재 사용자의 프로필 정보가 없거나 불완전한 경우 업데이트
+      if (
+        userEmail &&
+        (!userProfiles[userEmail]?.email || !userProfiles[userEmail]?.photoURL)
+      ) {
+        // Firebase에서 최신 사용자 정보 가져오기
+        const userDoc = await getDoc(doc(db, "users", userId));
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          // 로컬 userProfiles 상태 업데이트
+          setUserProfiles((prevProfiles) => ({
+            ...prevProfiles,
+            [userEmail]: {
+              email: userEmail,
+              displayName:
+                userData.displayName || user.displayName || undefined,
+              photoURL: userData.photoURL || user.photoURL || undefined,
+            },
+          }));
+        } else {
+          // Firebase에 사용자 프로필이 없다면 현재 user 객체로 업데이트
+          setUserProfiles((prevProfiles) => ({
+            ...prevProfiles,
+            [userEmail]: {
+              email: userEmail,
+              displayName: user.displayName || undefined,
+              photoURL: user.photoURL || undefined,
+            },
+          }));
+        }
+      }
+
+      // allSnippets 배열도 업데이트
+      if (snippetDoc.exists()) {
+        // 기존 스니펫 업데이트
+        setAllSnippets((prevSnippets) =>
+          prevSnippets.map((s) =>
+            s.snippetId === snippetId ? updatedSnippetData : s,
+          ),
+        );
+      } else {
+        // 새 스니펫 추가
+        setAllSnippets((prevSnippets) => [updatedSnippetData, ...prevSnippets]);
+      }
+
       setIsEditMode(false); // Return to view mode after saving
     } catch (error) {
       console.error("Error saving snippet:", error);
@@ -437,7 +507,7 @@ export default function SnippetPage({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [snippet, isEditMode, isToday]);
+  }, [snippet, isEditMode, isToday, handleSave, handleCancel]);
 
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">
@@ -503,15 +573,15 @@ export default function SnippetPage({
             // View Mode - Show all snippets for this date
             <div className="space-y-6 p-4">
               {allSnippets.length > 0 ? (
-                allSnippets.map((snippetData, index) => {
-                  const isMySnippet = user && snippetData.userId === user.uid;
-                  const userProfile = snippetData.userEmail
-                    ? userProfiles[snippetData.userEmail]
+                allSnippets.map((_snippetData, _index) => {
+                  const isMySnippet = user && _snippetData.userId === user.uid;
+                  const userProfile = _snippetData.userEmail
+                    ? userProfiles[_snippetData.userEmail]
                     : undefined;
 
                   return (
                     <div
-                      key={snippetData.snippetId}
+                      key={_snippetData.snippetId}
                       className="mb-6 border-b border-gray-100 pb-6 last:mb-0 last:border-b-0 last:pb-0"
                     >
                       {/* Show edit and delete buttons for my snippet if it's today */}
@@ -519,7 +589,7 @@ export default function SnippetPage({
                         <div className="mb-2 flex justify-end gap-2">
                           <button
                             onClick={() => {
-                              setSnippet(snippetData.snippet);
+                              setSnippet(_snippetData.snippet);
                               setIsEditMode(true);
                             }}
                             className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white transition hover:bg-blue-700"
@@ -547,7 +617,8 @@ export default function SnippetPage({
                             <img
                               src={userProfile.photoURL}
                               alt={
-                                userProfile.displayName || snippetData.userEmail
+                                userProfile.displayName ||
+                                _snippetData.userEmail
                               }
                               className="h-full w-full object-cover"
                             />
@@ -556,7 +627,7 @@ export default function SnippetPage({
                               {(
                                 (
                                   userProfile?.displayName ??
-                                  snippetData.userEmail ??
+                                  _snippetData.userEmail ??
                                   "?"
                                 ).charAt(0) ?? "?"
                               ).toUpperCase()}
@@ -564,7 +635,7 @@ export default function SnippetPage({
                           )}
                         </div>
                         <div className="font-medium">
-                          {userProfile?.displayName || snippetData.userEmail}
+                          {userProfile?.displayName || _snippetData.userEmail}
                         </div>
                       </div>
 
@@ -650,7 +721,7 @@ export default function SnippetPage({
                             ),
                           }}
                         >
-                          {snippetData.snippet}
+                          {_snippetData.snippet}
                         </ReactMarkdown>
                       </article>
                     </div>

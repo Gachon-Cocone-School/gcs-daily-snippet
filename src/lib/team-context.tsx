@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query } from "firebase/firestore";
 import { db } from "~/lib/firebase";
 import { useAuth } from "./auth-context";
 import Image from "next/image";
@@ -46,9 +46,15 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       // 내가 속한 팀 찾기
       teamsSnapshot.forEach((doc) => {
         const teamData = doc.data();
-        if (teamData.emails && teamData.emails.includes(user.email)) {
+        if (
+          teamData.emails &&
+          Array.isArray(teamData.emails) &&
+          teamData.emails.includes(user.email)
+        ) {
           // 내 이메일을 제외한 팀원 이메일 목록
-          teamEmails = teamData.emails.filter((email) => email !== user.email);
+          teamEmails = teamData.emails.filter(
+            (email: string) => email !== user.email,
+          );
         }
       });
 
@@ -124,7 +130,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       setTeamMembers([]);
       setIsTeamDataLoaded(false);
     }
-  }, [user]);
+  }, [user, fetchTeamData]);
 
   // 팀 정보 새로고침 함수
   const refreshTeamData = async () => {

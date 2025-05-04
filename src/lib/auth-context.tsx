@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // NEXT_PUBLIC_ALLOW_LIST 환경 변수에서 허용된 이메일 목록 가져오기
-      const allowList = process.env.NEXT_PUBLIC_ALLOW_LIST || "";
+      const allowList = process.env.NEXT_PUBLIC_ALLOW_LIST ?? "";
       const allowedEmails = allowList.split(",").map((email) => email.trim());
 
       // 사용자 이메일이 목록에 있는지 확인
@@ -99,10 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const teamsSnapshot = await getDocs(teamsQuery);
 
       // If we found a matching team, get its name
-      if (!teamsSnapshot.empty) {
+      if (!teamsSnapshot.empty && teamsSnapshot.docs[0]) {
         const teamDoc = teamsSnapshot.docs[0]; // Take the first matching team
         const teamData = teamDoc.data();
-        const userTeamName = teamData.teamName;
+        const userTeamName = teamData.teamName as string;
         setTeamName(userTeamName);
 
         console.log(`Found team for user: ${userTeamName}`);

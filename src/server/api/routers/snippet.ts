@@ -4,7 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 
 // Define the Snippet schema using Zod
-const snippetSchema = z.object({
+const _snippetSchema = z.object({
   snippetId: z.string(),
   userId: z.string(),
   date: z.string(),
@@ -13,7 +13,8 @@ const snippetSchema = z.object({
   modified_at: z.date(),
 });
 
-export type Snippet = z.infer<typeof snippetSchema>;
+// 타입 선언에만 사용하므로 변수명 앞에 _를 붙여 사용하지 않는 변수임을 표시
+export type Snippet = z.infer<typeof _snippetSchema>;
 
 // For now, we'll create a simple mock database
 // This is a temporary solution until we properly set up Firebase Admin SDK

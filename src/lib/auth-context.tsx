@@ -4,7 +4,14 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { auth, googleProvider, db } from "~/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import Strings from "~/constants/strings";
 
 interface AuthContextType {
@@ -13,6 +20,7 @@ interface AuthContextType {
   authorized: boolean | null;
   authChecking: boolean;
   authError: string | null;
+  teamName: string | null; // Add teamName to context
   signInWithGoogle: () => Promise<void>;
   logOut: () => Promise<void>;
 }
@@ -25,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [authChecking, setAuthChecking] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [teamName, setTeamName] = useState<string | null>(null); // Add teamName state
 
   // 사용자 이메일이 허용 목록에 등록되어 있는지 확인
   const checkUserAuthorization = async (user: User) => {
@@ -76,6 +85,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Find the user's team based on their email
+  const findUserTeam = async (userEmail: string | null) => {
+    if (!userEmail) return null;
+
+    try {
+      // Query the teams collection for documents where the emails array contains the user's email
+      const teamsQuery = query(
+        collection(db, "teams"),
+        where("emails", "array-contains", userEmail),
+      );
+
+      const teamsSnapshot = await getDocs(teamsQuery);
+
+      // If we found a matching team, get its name
+      if (!teamsSnapshot.empty) {
+        const teamDoc = teamsSnapshot.docs[0]; // Take the first matching team
+        const teamData = teamDoc.data();
+        const userTeamName = teamData.teamName;
+        setTeamName(userTeamName);
+
+        console.log(`Found team for user: ${userTeamName}`);
+        return userTeamName;
+      } else {
+        console.log("No team found for user");
+        setTeamName(null);
+        return null;
+      }
+    } catch (error) {
+      console.error("Error finding user team:", error);
+      setTeamName(null);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
@@ -85,8 +128,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void checkUserAuthorization(user);
         // 사용자 정보를 Firestore에 저장
         void saveUserToFirestore(user);
+        // Find the user's team
+        void findUserTeam(user.email);
       } else {
         setAuthorized(null);
+        setTeamName(null);
       }
 
       setLoading(false);
@@ -104,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.user) {
         await checkUserAuthorization(result.user);
         await saveUserToFirestore(result.user); // Firestore에 사용자 정보 저장
+        await findUserTeam(result.user.email); // Find the user's team
       }
     } catch (error) {
       console.error("Error signing in with Google", error);
@@ -130,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authorized,
         authChecking,
         authError,
+        teamName,
         signInWithGoogle,
         logOut,
       }}

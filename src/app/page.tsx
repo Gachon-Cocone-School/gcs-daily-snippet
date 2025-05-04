@@ -26,6 +26,13 @@ import Strings from "~/constants/strings";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "~/lib/firebase";
 
+// Define type for user profiles
+interface UserProfile {
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+}
+
 // Define type for snippets
 interface Snippet {
   userId: string;
@@ -33,6 +40,8 @@ interface Snippet {
   snippet: string;
   created_at: Date;
   modified_at: Date;
+  teamName: string;
+  userEmail: string;
 }
 
 // Simple Snackbar component
@@ -65,14 +74,23 @@ function Snackbar({
 }
 
 export default function Home() {
-  const { user, loading, logOut, authorized } = useAuth();
+  const { user, loading, logOut, authorized, teamName } = useAuth(); // Get teamName from auth context
   const router = useRouter();
   const [today] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(today);
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
   const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
-  const [userSnippets, setUserSnippets] = useState<Record<string, Snippet>>({});
+  const [userSnippets, setUserSnippets] = useState<Record<string, Snippet[]>>(
+    {},
+  );
   const [isLoadingSnippets, setIsLoadingSnippets] = useState(false);
+  // Add state for user profiles indexed by email
+  const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>(
+    {},
+  );
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+  // Add state to track if all data is fully loaded
+  const [isFullyLoaded, setIsFullyLoaded] = useState(false);
 
   // Generate years for dropdown (10 years back from current year)
   const currentYear = getYear(today);
@@ -81,28 +99,127 @@ export default function Home() {
   // Generate months for dropdown
   const months = Array.from({ length: 12 }, (_, i) => i);
 
+  // Add CSS variables for avatar overlaps based on screen size
+  useEffect(() => {
+    // CSS variable for avatar overlaps
+    document.documentElement.style.setProperty(
+      "--avatar-overlap-small",
+      "-14px",
+    );
+    document.documentElement.style.setProperty(
+      "--avatar-overlap-medium",
+      "-3px",
+    );
+    document.documentElement.style.setProperty("--avatar-overlap-large", "0px");
+  }, []);
+
+  // Function to extract all unique email addresses from snippets
+  const collectSnippetEmails = (
+    snippets: Record<string, Snippet[]>,
+  ): Set<string> => {
+    const emailSet = new Set<string>();
+
+    // Add all emails from snippets
+    Object.values(snippets).forEach((dateSnippets) => {
+      dateSnippets.forEach((snippet) => {
+        if (snippet.userEmail) {
+          emailSet.add(snippet.userEmail);
+        }
+      });
+    });
+
+    return emailSet;
+  };
+
+  // Function to fetch user profiles for a set of email addresses
+  const fetchUserProfiles = async (emails: Set<string>) => {
+    if (emails.size === 0) return;
+
+    setIsLoadingProfiles(true);
+    try {
+      const usersQuery = query(
+        collection(db, "users"),
+        where("email", "in", Array.from(emails)),
+      );
+
+      const querySnapshot = await getDocs(usersQuery);
+      const profilesMap: Record<string, UserProfile> = { ...userProfiles };
+
+      querySnapshot.forEach((doc) => {
+        const userData = doc.data();
+        if (userData.email) {
+          profilesMap[userData.email] = {
+            email: userData.email,
+            displayName: userData.displayName,
+            photoURL: userData.photoURL,
+          };
+        }
+      });
+
+      setUserProfiles(profilesMap);
+    } catch (error) {
+      console.error("Error fetching user profiles:", error);
+    } finally {
+      setIsLoadingProfiles(false);
+    }
+  };
+
+  // Helper function to get user profile for an email
+  const getUserProfile = (
+    email: string | undefined,
+  ): UserProfile | undefined => {
+    if (!email) return undefined;
+    return userProfiles[email];
+  };
+
   // Load snippets directly from Firestore
   useEffect(() => {
     async function fetchUserSnippets() {
-      if (!user) return;
+      if (!user || !teamName) return;
 
       setIsLoadingSnippets(true);
       try {
-        const userId = user.uid;
+        // Get the start and end dates for the current month view
+        const monthStart = startOfMonth(currentDate);
+        const monthEnd = endOfMonth(currentDate);
+        const startDateStr = format(monthStart, "yyyy-MM-dd");
+        const endDateStr = format(monthEnd, "yyyy-MM-dd");
+
+        // Query snippets for the team and date range
         const snippetsQuery = query(
           collection(db, "snippets"),
-          where("userId", "==", userId),
+          where("teamName", "==", teamName),
+          where("date", ">=", startDateStr),
+          where("date", "<=", endDateStr),
         );
 
         const querySnapshot = await getDocs(snippetsQuery);
-        const snippetsMap: Record<string, Snippet> = {};
+
+        // Create a map to store multiple snippets per date
+        const snippetsMap: Record<string, Snippet[]> = {};
 
         querySnapshot.forEach((doc) => {
           const data = doc.data() as Snippet;
-          snippetsMap[data.date] = data;
+          if (!snippetsMap[data.date]) {
+            snippetsMap[data.date] = [];
+          }
+          snippetsMap[data.date].push(data);
         });
 
         setUserSnippets(snippetsMap);
+
+        // Collect emails from all snippets
+        const emails = new Set<string>();
+        Object.values(snippetsMap).forEach((dateSnippets) => {
+          dateSnippets.forEach((snippet) => {
+            if (snippet.userEmail) {
+              emails.add(snippet.userEmail);
+            }
+          });
+        });
+
+        // Fetch user profiles
+        await fetchUserProfiles(emails);
       } catch (error) {
         console.error("Error fetching snippets:", error);
         showSnackbar("스니펫을 불러오는 중 오류가 발생했습니다.");
@@ -112,7 +229,7 @@ export default function Home() {
     }
 
     void fetchUserSnippets();
-  }, [user]);
+  }, [user, teamName, currentDate]); // Add currentDate dependency to refetch when month changes
 
   useEffect(() => {
     // 로그인되지 않았거나 인증되지 않은 사용자는 로그인 페이지로 리디렉션
@@ -132,6 +249,12 @@ export default function Home() {
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
     setCalendarDays(days);
   }, [user, loading, authorized, router, currentDate]);
+
+  // Update effect to track when data is fully loaded
+  useEffect(() => {
+    // Data is considered fully loaded when snippets are loaded and profiles are loaded
+    setIsFullyLoaded(!isLoadingSnippets && !isLoadingProfiles);
+  }, [isLoadingSnippets, isLoadingProfiles]);
 
   const showSnackbar = (message: string) => {
     setSnackbar({ visible: true, message });
@@ -206,25 +329,40 @@ export default function Home() {
 
   // Define the fetchUserSnippets function to refresh data
   const fetchUserSnippets = async () => {
-    if (!user) return;
+    if (!user || !teamName) return;
 
     setIsLoadingSnippets(true);
     try {
-      const userId = user.uid;
+      // Get the start and end dates for the current month view
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(currentDate);
+      const startDateStr = format(monthStart, "yyyy-MM-dd");
+      const endDateStr = format(monthEnd, "yyyy-MM-dd");
+
+      // Query snippets for the team and date range
       const snippetsQuery = query(
         collection(db, "snippets"),
-        where("userId", "==", userId),
+        where("teamName", "==", teamName),
+        where("date", ">=", startDateStr),
+        where("date", "<=", endDateStr),
       );
 
       const querySnapshot = await getDocs(snippetsQuery);
-      const snippetsMap: Record<string, Snippet> = {};
+      const snippetsMap: Record<string, Snippet[]> = {};
 
       querySnapshot.forEach((doc) => {
         const data = doc.data() as Snippet;
-        snippetsMap[data.date] = data;
+        if (!snippetsMap[data.date]) {
+          snippetsMap[data.date] = [];
+        }
+        snippetsMap[data.date].push(data);
       });
 
       setUserSnippets(snippetsMap);
+
+      // Collect emails and fetch user profiles
+      const emails = collectSnippetEmails(snippetsMap);
+      await fetchUserProfiles(emails);
     } catch (error) {
       console.error("Error refreshing snippets:", error);
     } finally {
@@ -289,7 +427,7 @@ export default function Home() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
               <line x1="21" y1="12" x2="9" y2="12"></line>
             </svg>
@@ -364,7 +502,19 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-7 gap-2">
+          {/* Data loading overlay */}
+          {(isLoadingSnippets || isLoadingProfiles) && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center">
+              <div className="rounded-md border border-gray-100 bg-white p-4 text-center text-gray-800 shadow-md">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"></div>
+                  <span>{Strings.loadingSnippets}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="relative grid grid-cols-7 gap-2">
             {Strings.daysOfWeek.map((day) => (
               <div
                 key={day}
@@ -385,7 +535,64 @@ export default function Home() {
               const isCurrentDay = isToday(date);
               const isPastDate = isDateBefore(date, today) && !isCurrentDay;
               const isFutureDate = isAfter(date, today);
-              const hasSnippetForDate = hasSnippet(date);
+              const dateString = format(date, "yyyy-MM-dd");
+              const hasSnippetForDate = !!userSnippets[dateString];
+              const snippetsForDate = userSnippets[dateString] || [];
+
+              // Get unique emails for this date and sort them:
+              // 1. Current user's email first
+              // 2. Others by modified_at timestamp (ascending)
+              let uniqueEmailAuthors: { email: string; modified_at: Date }[] =
+                [];
+
+              // First collect all unique authors with their latest modified time
+              const authorMap = new Map<string, Date>();
+              snippetsForDate.forEach((snippet) => {
+                if (snippet.userEmail) {
+                  // If we see this author for the first time, or this snippet is newer
+                  const currentModifiedTime = authorMap.get(snippet.userEmail);
+                  if (
+                    !currentModifiedTime ||
+                    (snippet.modified_at &&
+                      new Date(snippet.modified_at) > currentModifiedTime)
+                  ) {
+                    authorMap.set(
+                      snippet.userEmail,
+                      new Date(snippet.modified_at),
+                    );
+                  }
+                }
+              });
+
+              // Convert the map to an array of objects
+              uniqueEmailAuthors = Array.from(authorMap.entries()).map(
+                ([email, modified_at]) => ({
+                  email,
+                  modified_at,
+                }),
+              );
+
+              // Sort: current user first, then by modified_at in ascending order
+              uniqueEmailAuthors.sort((a, b) => {
+                // Current user always comes first
+                if (a.email === user?.email) return -1;
+                if (b.email === user?.email) return 1;
+
+                // Otherwise sort by modified_at (ascending)
+                return a.modified_at.getTime() - b.modified_at.getTime();
+              });
+
+              // Get only the emails
+              const sortedEmails = uniqueEmailAuthors.map(
+                (author) => author.email,
+              );
+
+              // Count total avatars
+              const totalAvatars = sortedEmails.length;
+              // Limit visible avatars to 4
+              const visibleAvatars = sortedEmails.slice(0, 4);
+              // Calculate extras
+              const extraAvatars = totalAvatars > 4 ? totalAvatars - 4 : 0;
 
               return (
                 <div
@@ -400,23 +607,65 @@ export default function Home() {
                   } ${hasSnippetForDate ? "font-bold" : ""} relative`}
                 >
                   {format(date, "d")}
-                  {hasSnippetForDate && !isFutureDate && (
-                    <div className="absolute bottom-1 left-1 h-4 w-4 overflow-hidden rounded-full border border-white">
-                      {user?.photoURL ? (
-                        <img
-                          src={user.photoURL}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-blue-500 text-[6px] text-white">
-                          {(
-                            (user?.displayName ?? user?.email ?? "?").charAt(
-                              0,
-                            ) ?? "?"
-                          ).toUpperCase()}
+                  {hasSnippetForDate && !isFutureDate && isFullyLoaded && (
+                    <div className="absolute bottom-[5%] left-[5%] flex flex-col items-start">
+                      {/* Show +n indicator for additional avatars above the avatars */}
+                      {extraAvatars > 0 && (
+                        <div
+                          className="mb-0.5 flex h-[18%] max-h-5 min-h-3 w-auto min-w-[14px] items-center justify-center rounded-full bg-gray-200 px-1 text-[8px] font-medium text-gray-600 sm:text-[10px]"
+                          style={{ zIndex: 45 }}
+                          title={`${extraAvatars} more contributor${extraAvatars > 1 ? "s" : ""}`}
+                        >
+                          +{extraAvatars}
                         </div>
                       )}
+
+                      <div className="flex overflow-visible">
+                        {visibleAvatars.map((email, index) => {
+                          const userProfile = userProfiles[email];
+                          const isCurrentUser = email === user?.email;
+
+                          return (
+                            <div
+                              key={`${dateString}-${email}`}
+                              className={`h-5 w-5 overflow-hidden rounded-full border ${isCurrentUser ? "border-blue-300" : "border-white"}`}
+                              style={{
+                                zIndex: 40 - index,
+                                marginLeft:
+                                  index > 0 ? "var(--avatar-overlap)" : "0px",
+                                boxShadow: isCurrentUser
+                                  ? "0 0 0 1px rgba(59, 130, 246, 0.3)"
+                                  : "none",
+                              }}
+                              title={userProfile?.displayName || email}
+                            >
+                              {userProfile?.photoURL ? (
+                                <img
+                                  src={userProfile.photoURL}
+                                  alt={userProfile.displayName || email}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className={`flex h-full w-full items-center justify-center text-[6px] text-white sm:text-[8px] ${
+                                    isCurrentUser
+                                      ? "bg-blue-600"
+                                      : "bg-blue-500"
+                                  }`}
+                                >
+                                  {(
+                                    (
+                                      userProfile?.displayName ??
+                                      email ??
+                                      "?"
+                                    ).charAt(0) ?? "?"
+                                  ).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -447,6 +696,23 @@ export default function Home() {
 
         .animate-fade-in-up {
           animation: fadeInUp 0.3s ease-out;
+        }
+
+        /* Avatar overlap based on screen size */
+        :root {
+          --avatar-overlap: -14px; /* Mobile default */
+        }
+
+        @media (min-width: 768px) {
+          :root {
+            --avatar-overlap: -8px; /* Tablet */
+          }
+        }
+
+        @media (min-width: 1024px) {
+          :root {
+            --avatar-overlap: 0px; /* Desktop */
+          }
         }
       `}</style>
     </main>

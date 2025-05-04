@@ -5,8 +5,8 @@
 
 export const Strings = {
   // Common
-  appName: "Daily Springboard",
-  loading: "Loading...",
+  appName: "Daily Snippet",
+  loading: "로딩중...",
 
   // Auth related
   signInWithGoogle: "구글 계정으로 로그인",
@@ -50,6 +50,7 @@ export const Strings = {
 
   // Messages
   noFutureMonths: "이번달 이후는 볼 수 없습니다.",
+  loadingSnippets: "스니펫 데이터 조회중...",
 };
 
 export default Strings;

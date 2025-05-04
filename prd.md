@@ -48,3 +48,10 @@
 - 구글계정 로그인 한 후에 구글 이메일을 읽는다.
 - firestore collection 에 있는 members 에 email 이 등록된 사용자라면 인증이 성공하고 아닌 경우에는 "GCS 멤버만 사용가능합니다" 라는 메시지를 보여준다.
 - string table 로 뺴서 처리해야 함
+
+# 팀명 저장하기
+
+- 로그인을 할떄 user 가 소속된 teamName 을 teams 컬렉션에서 찾아서 Client side state 에 저장해.
+  - teams 컬렉션에는 teamName 과 emails 필드가 있어.
+  - emails 필드는 array 고 여기에 내 email 이 있으면 그 팀이 내팀이야.
+- 그리고 snippet 을 저장/업데이트 할때 teamName 과 userEmail 을 저장해줘.

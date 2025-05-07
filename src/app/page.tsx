@@ -24,6 +24,7 @@ import { ko } from "date-fns/locale";
 import Strings from "~/constants/strings";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "~/lib/firebase";
+import Image from "next/image";
 
 // Define type for user profiles
 interface UserProfile {
@@ -395,10 +396,13 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             {user.photoURL ? (
-              <img
+              <Image
                 src={user.photoURL}
                 alt="사용자 아바타"
                 className="h-8 w-8 rounded-full"
+                width={32}
+                height={32}
+                unoptimized={user.photoURL.startsWith("data:")}
               />
             ) : (
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
@@ -644,10 +648,15 @@ export default function Home() {
                               title={userProfile?.displayName || email}
                             >
                               {userProfile?.photoURL ? (
-                                <img
+                                <Image
                                   src={userProfile.photoURL}
                                   alt={userProfile.displayName || email}
                                   className="h-full w-full object-cover"
+                                  width={28}
+                                  height={28}
+                                  unoptimized={userProfile.photoURL.startsWith(
+                                    "data:",
+                                  )}
                                 />
                               ) : (
                                 <div

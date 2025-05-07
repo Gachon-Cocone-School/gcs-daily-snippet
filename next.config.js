@@ -4,10 +4,13 @@
  */
 import "./src/env.js";
 
+// Log the PORT environment variable to debug
+console.log("Environment PORT:", process.env.PORT);
+
 /** @type {import("next").NextConfig} */
 const config = {
   images: {
-    domains: ['lh3.googleusercontent.com'], // Google 프로필 이미지 도메인 추가
+    domains: ["lh3.googleusercontent.com"], // Google 프로필 이미지 도메인 추가
   },
 };
 

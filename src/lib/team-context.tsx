@@ -60,7 +60,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
           // 내 이메일을 제외한 팀원 이메일 목록
           teamEmails = teamData.emails.filter(
             (email: string) => email !== user.email,
-          );
+          ) as string[];
         }
       });
 
@@ -78,29 +78,29 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       // 팀원 정보 수집
       usersSnapshot.forEach((doc) => {
         const userData = doc.data();
-        if (userData.email && teamEmails.includes(userData.email)) {
+        if (userData.email && teamEmails.includes(userData.email as string)) {
           // 이미지 컴포넌트 미리 생성
           let imageComponent = null;
           if (userData.photoURL) {
             imageComponent = (
               <Image
-                src={userData.photoURL}
-                alt={userData.displayName || userData.email}
+                src={userData.photoURL as string}
+                alt={(userData.displayName ?? userData.email) as string}
                 width={40}
                 height={40}
                 className="h-full w-full rounded-full object-cover"
-                priority={teamEmails.indexOf(userData.email) < 5} // 처음 5명은 우선적으로 로드
-                unoptimized={userData.photoURL.startsWith("data:")} // data URL인 경우 최적화 비활성화
+                priority={teamEmails.indexOf(userData.email as string) < 5} // 처음 5명은 우선적으로 로드
+                unoptimized={(userData.photoURL as string).startsWith("data:")} // data URL인 경우 최적화 비활성화
               />
             );
           }
 
           members.push({
-            email: userData.email,
-            photoURL: userData.photoURL,
-            displayName: userData.displayName,
+            email: userData.email as string,
+            photoURL: userData.photoURL as string | undefined,
+            displayName: userData.displayName as string | undefined,
             // 이메일 인덱스에 따라 우선순위 설정 (정렬을 위함)
-            priority: teamEmails.indexOf(userData.email),
+            priority: teamEmails.indexOf(userData.email as string),
             imageComponent,
           });
         }

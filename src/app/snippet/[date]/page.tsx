@@ -20,6 +20,7 @@ import Strings from "~/constants/strings";
 import { use } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import Image from "next/image";
 
 // Types for snippet data and user profiles
 interface SnippetData {
@@ -337,7 +338,7 @@ export default function SnippetPage({
   ]);
 
   // Save the snippet to Firestore
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!isEditMode || !user || !isToday) return;
 
     setIsSaving(true);
@@ -414,8 +415,8 @@ export default function SnippetPage({
             [userEmail]: {
               email: userEmail,
               displayName:
-                userData.displayName || user.displayName || undefined,
-              photoURL: userData.photoURL || user.photoURL || undefined,
+                userData.displayName ?? user.displayName ?? undefined,
+              photoURL: userData.photoURL ?? user.photoURL ?? undefined,
             },
           }));
         } else {
@@ -424,8 +425,8 @@ export default function SnippetPage({
             ...prevProfiles,
             [userEmail]: {
               email: userEmail,
-              displayName: user.displayName || undefined,
-              photoURL: user.photoURL || undefined,
+              displayName: user.displayName ?? undefined,
+              photoURL: user.photoURL ?? undefined,
             },
           }));
         }
@@ -450,7 +451,28 @@ export default function SnippetPage({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [
+    isEditMode,
+    user,
+    isToday,
+    snippet,
+    formattedDate,
+    teamName,
+    userProfiles,
+    setOriginalSnippet,
+    setSnippetExists,
+    setMySnippet,
+    setUserProfiles,
+    setAllSnippets,
+    setIsEditMode,
+  ]);
+
+  // 취소 버튼 - 원본 내용으로 복원
+  const handleCancel = useCallback(() => {
+    // 원본 스니펫으로 복원
+    setSnippet(originalSnippet);
+    setIsEditMode(false); // 보기 모드로 돌아가기
+  }, [originalSnippet]);
 
   // Delete the snippet from Firestore
   const handleDelete = async () => {
@@ -483,13 +505,6 @@ export default function SnippetPage({
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  // 취소 버튼 - 원본 내용으로 복원
-  const handleCancel = () => {
-    // 원본 스니펫으로 복원
-    setSnippet(originalSnippet);
-    setIsEditMode(false); // 보기 모드로 돌아가기
   };
 
   // Keyboard shortcuts for saving (Ctrl+Enter or Command+Enter)
@@ -614,13 +629,18 @@ export default function SnippetPage({
                       <div className="mb-3 flex items-center">
                         <div className="mr-2 h-8 w-8 overflow-hidden rounded-full border border-gray-200">
                           {userProfile?.photoURL ? (
-                            <img
+                            <Image
                               src={userProfile.photoURL}
                               alt={
                                 userProfile.displayName ||
                                 _snippetData.userEmail
                               }
                               className="h-full w-full object-cover"
+                              width={32}
+                              height={32}
+                              unoptimized={userProfile.photoURL.startsWith(
+                                "data:",
+                              )}
                             />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center bg-blue-500 text-white">
@@ -644,76 +664,76 @@ export default function SnippetPage({
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            h1: ({ node, ...props }) => (
+                            h1: ({ ...props }) => (
                               <h1
                                 className="mt-4 mb-2 text-2xl font-bold"
                                 {...props}
                               />
                             ),
-                            h2: ({ node, ...props }) => (
+                            h2: ({ ...props }) => (
                               <h2
                                 className="mt-4 mb-2 text-xl font-bold"
                                 {...props}
                               />
                             ),
-                            h3: ({ node, ...props }) => (
+                            h3: ({ ...props }) => (
                               <h3
                                 className="mt-3 mb-2 text-lg font-bold"
                                 {...props}
                               />
                             ),
-                            h4: ({ node, ...props }) => (
+                            h4: ({ ...props }) => (
                               <h4
                                 className="mt-3 mb-1 text-base font-bold"
                                 {...props}
                               />
                             ),
-                            h5: ({ node, ...props }) => (
+                            h5: ({ ...props }) => (
                               <h5
                                 className="mt-2 mb-1 text-sm font-bold"
                                 {...props}
                               />
                             ),
-                            h6: ({ node, ...props }) => (
+                            h6: ({ ...props }) => (
                               <h6
                                 className="mt-2 mb-1 text-xs font-bold"
                                 {...props}
                               />
                             ),
-                            ul: ({ node, ...props }) => (
+                            ul: ({ ...props }) => (
                               <ul className="my-2 list-disc pl-5" {...props} />
                             ),
-                            ol: ({ node, ...props }) => (
+                            ol: ({ ...props }) => (
                               <ol
                                 className="my-2 list-decimal pl-5"
                                 {...props}
                               />
                             ),
-                            li: ({ node, ...props }) => (
+                            li: ({ ...props }) => (
                               <li className="my-1" {...props} />
                             ),
-                            a: ({ node, ...props }) => (
+                            a: ({ ...props }) => (
                               <a
                                 className="text-blue-500 hover:underline"
                                 {...props}
                               />
                             ),
-                            p: ({ node, ...props }) => (
+                            p: ({ ...props }) => (
                               <p className="my-2" {...props} />
                             ),
-                            blockquote: ({ node, ...props }) => (
+                            blockquote: ({ ...props }) => (
                               <blockquote
                                 className="my-2 border-l-4 border-gray-300 pl-4 italic"
                                 {...props}
                               />
                             ),
-                            code: ({ node, ...props }) => (
+                            code: ({ ...props }) => (
                               <code
                                 className="rounded bg-gray-100 px-1 py-0.5"
                                 {...props}
                               />
                             ),
-                            pre: ({ node, ...props }) => (
+                            pre: ({ ...props }) => (
                               <pre
                                 className="overflow-auto rounded bg-gray-100 p-3"
                                 {...props}

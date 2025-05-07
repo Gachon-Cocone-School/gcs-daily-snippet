@@ -428,7 +428,7 @@ export default function Home() {
       </header>
 
       <div className="container mx-auto flex flex-1 flex-col items-center justify-center p-4">
-        <div className="w-full max-w-4xl rounded-lg bg-white p-6 shadow-sm">
+        <div className="w-full max-w-4xl rounded-lg bg-white p-4 shadow-sm md:max-w-5xl md:p-6 lg:max-w-6xl xl:max-w-7xl">
           <div className="mb-4 flex items-center justify-between">
             <button
               onClick={goToPreviousMonth}
@@ -506,11 +506,11 @@ export default function Home() {
             </div>
           )}
 
-          <div className="relative grid grid-cols-7 gap-2">
+          <div className="relative grid grid-cols-7 gap-2 md:gap-3 lg:gap-4">
             {Strings.daysOfWeek.map((day) => (
               <div
                 key={day}
-                className="p-2 text-center font-medium text-gray-500"
+                className="p-2 text-center font-medium text-gray-500 md:p-3 md:text-lg"
               >
                 {day}
               </div>
@@ -519,7 +519,7 @@ export default function Home() {
             {/* Empty cells for proper day alignment */}
             {calendarDays.length > 0 &&
               Array.from({ length: calendarDays[0]?.getDay() ?? 0 }, (_, i) => (
-                <div key={`empty-${i}`} className="p-2"></div>
+                <div key={`empty-${i}`} className="p-2 md:p-3"></div>
               ))}
 
             {/* Calendar days */}
@@ -591,21 +591,23 @@ export default function Home() {
                 <div
                   key={date.toISOString()}
                   onClick={() => !isFutureDate && handleDateClick(date)}
-                  className={`rounded-md p-3 text-center transition ${
+                  className={`rounded-md p-2 text-center transition md:p-3 lg:p-4 ${
                     isCurrentDay
                       ? "bg-blue-100 font-medium text-blue-600"
                       : isFutureDate
                         ? "cursor-not-allowed bg-gray-100 text-gray-400"
                         : "cursor-pointer text-gray-700 hover:bg-gray-50"
-                  } ${hasSnippetForDate ? "font-bold" : ""} relative`}
+                  } ${hasSnippetForDate ? "font-bold" : ""} relative min-h-[40px] md:min-h-[60px] lg:min-h-[80px]`}
                 >
-                  {format(date, "d")}
+                  <div className="text-sm md:text-base lg:text-lg">
+                    {format(date, "d")}
+                  </div>
                   {hasSnippetForDate && !isFutureDate && isFullyLoaded && (
                     <div className="absolute bottom-[5%] left-[5%] flex flex-col items-start">
                       {/* Show +n indicator for additional avatars above the avatars */}
                       {extraAvatars > 0 && (
                         <div
-                          className="mb-0.5 flex h-[18%] max-h-5 min-h-3 w-auto min-w-[14px] items-center justify-center rounded-full bg-gray-200 px-1 text-[8px] font-medium text-gray-600 sm:text-[10px]"
+                          className="mb-0.5 flex h-[18%] max-h-5 min-h-3 w-auto min-w-[14px] items-center justify-center rounded-full bg-gray-200 px-1 text-[8px] font-medium text-gray-600 sm:text-[10px] md:text-[12px] lg:text-xs"
                           style={{ zIndex: 45 }}
                           title={`${extraAvatars} more contributor${extraAvatars > 1 ? "s" : ""}`}
                         >
@@ -621,7 +623,7 @@ export default function Home() {
                           return (
                             <div
                               key={`${dateString}-${email}`}
-                              className={`h-5 w-5 overflow-hidden rounded-full border ${isCurrentUser ? "border-blue-300" : "border-white"}`}
+                              className={`h-5 w-5 overflow-hidden rounded-full border md:h-6 md:w-6 lg:h-7 lg:w-7 ${isCurrentUser ? "border-blue-300" : "border-white"}`}
                               style={{
                                 zIndex: 40 - index,
                                 marginLeft:
@@ -640,7 +642,7 @@ export default function Home() {
                                 />
                               ) : (
                                 <div
-                                  className={`flex h-full w-full items-center justify-center text-[6px] text-white sm:text-[8px] ${
+                                  className={`flex h-full w-full items-center justify-center text-[6px] text-white sm:text-[8px] md:text-[10px] lg:text-xs ${
                                     isCurrentUser
                                       ? "bg-blue-600"
                                       : "bg-blue-500"
@@ -704,7 +706,13 @@ export default function Home() {
 
         @media (min-width: 1024px) {
           :root {
-            --avatar-overlap: 0px; /* Desktop */
+            --avatar-overlap: -3px; /* Desktop */
+          }
+        }
+
+        @media (min-width: 1280px) {
+          :root {
+            --avatar-overlap: 0px; /* Large Desktop */
           }
         }
       `}</style>

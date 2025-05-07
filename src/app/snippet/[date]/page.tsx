@@ -510,7 +510,7 @@ export default function SnippetPage({
   }, [snippet, isEditMode, isToday, handleSave, handleCancel]);
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-8">
+    <div className="container mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8 md:max-w-5xl lg:max-w-6xl xl:max-w-7xl">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">{displayDate}</h1>
         <Link
@@ -522,14 +522,14 @@ export default function SnippetPage({
       </div>
 
       {isLoadingSnippets ? (
-        <div className="flex items-center justify-center py-10">
+        <div className="flex flex-grow items-center justify-center py-10">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="flex flex-grow flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
           {isEditMode ? (
             // Edit Mode - Plain text editor
-            <div className="p-4">
+            <div className="flex flex-grow flex-col p-4">
               <div className="mb-2 text-sm text-gray-500">
                 <div>{Strings.markdownSupported}</div>
                 <div className="rounded-md bg-gray-50 p-2 font-mono text-xs whitespace-pre text-gray-400">
@@ -541,7 +541,7 @@ export default function SnippetPage({
                 value={snippet}
                 onChange={(e) => setSnippet(e.target.value)}
                 onKeyDown={handleTabKeyForPreviousSnippet}
-                className="mb-4 h-80 w-full resize-none rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                className="mb-4 min-h-[20rem] w-full flex-grow resize-none rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 placeholder={
                   previousSnippetPlaceholder
                     ? `${Strings.snippetPlaceholder}\n\n${previousSnippetPlaceholder.slice(0, 150)}${previousSnippetPlaceholder.length > 150 ? "..." : ""}`
@@ -571,7 +571,7 @@ export default function SnippetPage({
             </div>
           ) : (
             // View Mode - Show all snippets for this date
-            <div className="space-y-6 p-4">
+            <div className="flex-grow space-y-6 p-4">
               {allSnippets.length > 0 ? (
                 allSnippets.map((_snippetData, _index) => {
                   const isMySnippet = user && _snippetData.userId === user.uid;

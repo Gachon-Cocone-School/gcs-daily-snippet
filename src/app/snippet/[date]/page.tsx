@@ -21,6 +21,7 @@ import { use } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Image from "next/image";
+import { env } from "~/env";
 
 // Types for snippet data and user profiles
 interface SnippetData {
@@ -86,22 +87,58 @@ export default function SnippetPage({
   );
   const isYesterday = formattedDate === yesterday;
 
-  // Function to check if editing is allowed based on time (today or yesterday before 09:00 KST)
+  // Function to check if editing is allowed based on time (today or yesterday before deadline KST)
   const isEditingAllowed = useCallback(() => {
-    if (isToday) return true;
+    // For debugging
+    console.log("Checking if editing is allowed");
 
-    if (isYesterday) {
-      // Check if current time is before 09:00 KST
-      const now = new Date();
-      // Create a date object with KST timezone offset (+9 hours)
-      const kstNow = new Date(
-        now.getTime() + (9 * 60 - now.getTimezoneOffset()) * 60000,
-      );
-      const kstHours = kstNow.getHours();
-
-      return kstHours < 9; // Allow editing if before 09:00 KST
+    if (isToday) {
+      console.log("Today - editing allowed");
+      return true;
     }
 
+    if (isYesterday) {
+      try {
+        // 환경 변수에서 마감 시간 가져오기 (기본값: 9)
+        const deadlineHour = parseInt(
+          env.NEXT_PUBLIC_SNIPPET_DEADLINE_HOUR || "9",
+          10,
+        );
+        console.log(`Deadline hour: ${deadlineHour}:00 KST`);
+
+        // 현재 UTC 시간 가져오기
+        const now = new Date();
+
+        // 현재 시간을 KST로 변환 (UTC+9)
+        // UTC 시간을 밀리초로 변환 후 KST 오프셋(9시간) 추가
+        const utcMilliseconds = now.getTime();
+        const kstMilliseconds = utcMilliseconds + 9 * 60 * 60 * 1000;
+        const kstDate = new Date(kstMilliseconds);
+
+        // KST 기준 시간 추출
+        const kstHours = kstDate.getUTCHours();
+        const kstMinutes = kstDate.getUTCMinutes();
+
+        console.log(
+          `Current KST time: ${kstHours}:${kstMinutes} (calculated with UTC)`,
+        );
+
+        // 마감 시간(예: 9시) 이전인지 확인
+        if (kstHours < deadlineHour) {
+          console.log(`Before ${deadlineHour}:00 KST - editing allowed`);
+          return true;
+        } else {
+          console.log(`After ${deadlineHour}:00 KST - editing not allowed`);
+          return false;
+        }
+      } catch (error) {
+        console.error("Error calculating KST time:", error);
+        // 에러 발생 시 기본적으로 수정 불가능 처리
+        return false;
+      }
+    }
+
+    console.log("Not today or yesterday - editing not allowed");
     return false;
   }, [isToday, isYesterday]);
 

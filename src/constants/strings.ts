@@ -5,8 +5,9 @@
 
 export const Strings = {
   // Common
-  appName: "Daily Snippet",
+  appName: "Daily",
   loading: "로딩중...",
+  titleFormat: "{appName} - {teamAlias}", // New format string for title with team alias
 
   // Auth related
   signInWithGoogle: "구글 계정으로 로그인",

@@ -73,7 +73,7 @@ function Snackbar({
 }
 
 export default function Home() {
-  const { user, loading, logOut, authorized, teamName } = useAuth(); // Get teamName from auth context
+  const { user, loading, logOut, authorized, teamName, teamAlias } = useAuth(); // Get teamAlias from auth context
   const router = useRouter();
   const [today] = useState(new Date());
   const [currentDate, setCurrentDate] = useState(today);
@@ -379,10 +379,19 @@ export default function Home() {
     return null; // Will redirect in useEffect
   }
 
+  // Get the last teamAlias if available
+  const lastTeamAlias =
+    teamAlias && teamAlias.length > 0 ? teamAlias[teamAlias.length - 1] : null;
+
+  // Construct the app title with the last teamAlias if available
+  const appTitle = lastTeamAlias
+    ? `${Strings.appName} - ${lastTeamAlias}`
+    : Strings.appName;
+
   return (
     <main className="flex min-h-screen flex-col bg-gray-50 text-gray-800">
       <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4 shadow-sm">
-        <h1 className="text-2xl font-medium">{Strings.appName}</h1>
+        <h1 className="text-2xl font-medium">{appTitle}</h1>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             {user.photoURL ? (

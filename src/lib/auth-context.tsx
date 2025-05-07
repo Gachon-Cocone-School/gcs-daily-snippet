@@ -21,6 +21,7 @@ interface AuthContextType {
   authChecking: boolean;
   authError: string | null;
   teamName: string | null; // Add teamName to context
+  teamAlias: string[] | null; // Add teamAlias array to context
   signInWithGoogle: () => Promise<void>;
   logOut: () => Promise<void>;
 }
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authChecking, setAuthChecking] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [teamName, setTeamName] = useState<string | null>(null); // Add teamName state
+  const [teamAlias, setTeamAlias] = useState<string[] | null>(null); // Add teamAlias state
 
   // 사용자 이메일이 허용 목록에 등록되어 있는지 확인
   const checkUserAuthorization = async (user: User) => {
@@ -116,18 +118,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const teamDoc = teamsSnapshot.docs[0]; // Take the first matching team
         const teamData = teamDoc.data();
         const userTeamName = teamData.teamName as string;
+        const userTeamAlias = (teamData.teamAlias as string[]) || [];
+
         setTeamName(userTeamName);
+        setTeamAlias(userTeamAlias);
 
         console.log(`Found team for user: ${userTeamName}`);
         return userTeamName;
       } else {
         console.log("No team found for user");
         setTeamName(null);
+        setTeamAlias(null);
         return null;
       }
     } catch (error) {
       console.error("Error finding user team:", error);
       setTeamName(null);
+      setTeamAlias(null);
       return null;
     }
   };
@@ -191,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authChecking,
         authError,
         teamName,
+        teamAlias,
         signInWithGoogle,
         logOut,
       }}

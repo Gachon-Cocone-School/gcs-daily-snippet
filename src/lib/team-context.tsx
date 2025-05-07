@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { collection, getDocs, query } from "firebase/firestore";
 import { db } from "~/lib/firebase";
 import { useAuth } from "./auth-context";
@@ -29,8 +35,8 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isTeamDataLoaded, setIsTeamDataLoaded] = useState(false);
 
-  // 팀원 정보 가져오기
-  const fetchTeamData = async () => {
+  // 팀원 정보 가져오기 - useCallback으로 래핑하여 메모이제이션
+  const fetchTeamData = useCallback(async () => {
     if (!user?.email) return;
 
     try {
@@ -120,7 +126,7 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       console.error("Error fetching team data:", error);
       setIsTeamDataLoaded(true);
     }
-  };
+  }, [user]); // Only re-create when user changes
 
   // 사용자 로그인 시 팀 정보 가져오기
   useEffect(() => {
@@ -130,13 +136,13 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       setTeamMembers([]);
       setIsTeamDataLoaded(false);
     }
-  }, [user, fetchTeamData]);
+  }, [user, fetchTeamData]); // Now fetchTeamData is stable between renders
 
   // 팀 정보 새로고침 함수
-  const refreshTeamData = async () => {
+  const refreshTeamData = useCallback(async () => {
     setIsTeamDataLoaded(false);
     await fetchTeamData();
-  };
+  }, [fetchTeamData]); // Also memoize this function
 
   return (
     <TeamContext.Provider

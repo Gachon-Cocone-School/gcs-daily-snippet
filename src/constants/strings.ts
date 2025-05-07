@@ -18,7 +18,7 @@ export const Strings = {
 
   // Login page
   appTagline:
-    "가천코코네스쿨 학생들을 위한 daily spring board 입니다. 매일 매일의 일정을 기록하고 나만의 스프링보드를 만들어보아요.",
+    "가천코코네스쿨 학생들을 위한 daily snippets 입니다. 매일을 기록하고 나만의 스프링보드를 만들어보아요.",
 
   // Calendar
   today: "오늘",
@@ -38,7 +38,7 @@ export const Strings = {
   noSnippetForDate: "이 날짜에 스니펫이 없습니다.",
   snippetPlaceholder: "Tab 키를 누르면 제안된 스니펫이 적용됩니다.",
   snippetTemplate:
-    "# 오늘의 할 일\n\n- [ ] 작업 1\n- [ ] 작업 2\n- [ ] 작업 3\n\n# 메모\n\n내용을 입력하세요...",
+    "# 오늘 한 일\n\n- [ ] 작업 1\n- [ ] 작업 2\n- [ ] 작업 3\n\n# 메모\n\n내용을 입력하세요...",
 
   // Markdown
   markdownSupported: "마크다운 문법을 사용할 수 있습니다",

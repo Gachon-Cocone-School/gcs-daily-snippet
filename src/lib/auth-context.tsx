@@ -43,12 +43,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthError(null);
 
     try {
-      // NEXT_PUBLIC_ALLOW_LIST 환경 변수에서 허용된 이메일 목록 가져오기
-      const allowList = process.env.NEXT_PUBLIC_ALLOW_LIST ?? "";
-      const allowedEmails = allowList.split(",").map((email) => email.trim());
+      // Firestore에서 allow_lists 컬렉션의 모든 문서를 가져옵니다
+      const allowListsRef = collection(db, "allow_lists");
+      const allowListsSnapshot = await getDocs(allowListsRef);
 
-      // 사용자 이메일이 목록에 있는지 확인
-      const isAuthorized = allowedEmails.includes(user.email);
+      // 모든 이메일 주소를 저장할 Set 생성
+      const allowedEmails = new Set<string>();
+
+      // 각 문서의 emails 배열에서 이메일 주소를 가져와 Set에 추가
+      allowListsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.emails && Array.isArray(data.emails)) {
+          data.emails.forEach((email: string) => {
+            allowedEmails.add(email.trim());
+          });
+        }
+      });
+
+      // 사용자 이메일이 Set에 있는지 확인
+      const isAuthorized = allowedEmails.has(user.email);
       setAuthorized(isAuthorized);
       return isAuthorized;
     } catch (error) {

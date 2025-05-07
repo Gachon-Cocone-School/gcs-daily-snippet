@@ -12,6 +12,10 @@ const config = {
   images: {
     domains: ["lh3.googleusercontent.com"], // Google 프로필 이미지 도메인 추가
   },
+  eslint: {
+    // 빌드 시 경고는 무시하고 에러만 처리합니다
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default config;

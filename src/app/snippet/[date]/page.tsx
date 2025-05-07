@@ -78,6 +78,33 @@ export default function SnippetPage({
   // Check if the date is today
   const today = format(new Date(), "yyyy-MM-dd");
   const isToday = formattedDate === today;
+
+  // Calculate yesterday's date
+  const yesterday = format(
+    new Date(new Date().setDate(new Date().getDate() - 1)),
+    "yyyy-MM-dd",
+  );
+  const isYesterday = formattedDate === yesterday;
+
+  // Function to check if editing is allowed based on time (today or yesterday before 09:00 KST)
+  const isEditingAllowed = useCallback(() => {
+    if (isToday) return true;
+
+    if (isYesterday) {
+      // Check if current time is before 09:00 KST
+      const now = new Date();
+      // Create a date object with KST timezone offset (+9 hours)
+      const kstNow = new Date(
+        now.getTime() + (9 * 60 - now.getTimezoneOffset()) * 60000,
+      );
+      const kstHours = kstNow.getHours();
+
+      return kstHours < 9; // Allow editing if before 09:00 KST
+    }
+
+    return false;
+  }, [isToday, isYesterday]);
+
   const [snippetExists, setSnippetExists] = useState(false);
 
   // Function to fetch user profiles for a set of email addresses
@@ -339,7 +366,7 @@ export default function SnippetPage({
 
   // Save the snippet to Firestore
   const handleSave = useCallback(async () => {
-    if (!isEditMode || !user || !isToday) return;
+    if (!isEditMode || !user || !isEditingAllowed()) return;
 
     setIsSaving(true);
     try {
@@ -454,7 +481,7 @@ export default function SnippetPage({
   }, [
     isEditMode,
     user,
-    isToday,
+    isEditingAllowed,
     snippet,
     formattedDate,
     teamName,
@@ -476,7 +503,7 @@ export default function SnippetPage({
 
   // Delete the snippet from Firestore
   const handleDelete = async () => {
-    if (!user || !isToday || !mySnippet) return;
+    if (!user || !isEditingAllowed() || !mySnippet) return;
 
     if (!confirm("스니펫을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.")) {
       return;
@@ -599,8 +626,8 @@ export default function SnippetPage({
                       key={_snippetData.snippetId}
                       className="mb-6 border-b border-gray-100 pb-6 last:mb-0 last:border-b-0 last:pb-0"
                     >
-                      {/* Show edit and delete buttons for my snippet if it's today */}
-                      {isMySnippet && isToday && (
+                      {/* Show edit and delete buttons for my snippet if editing is allowed */}
+                      {isMySnippet && isEditingAllowed() && (
                         <div className="mb-2 flex justify-end gap-2">
                           <button
                             onClick={() => {
